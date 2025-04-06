@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
 	canvasFile: 'canvas.json',
 	writingFrequency: '0',
 	writeFilesOnLaunch: false,
+	processCalloutBlocks: false,
 	consoleLog: false,
 };
 
@@ -205,6 +206,22 @@ export class BridgeSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.consoleLog)
 					.onChange((state) => {
 						this.plugin.settings.consoleLog = state;
+						this.plugin.saveSettings();
+					});
+			});
+
+		new Setting(containerEl)
+			.setName('Process callout blocks')
+			.setDesc(
+				'If enabled, it will process each block-id (ie ^some-id) and if it \
+				corresponds to a callout it will export it as an H6. For now this is \
+				experimental so it works with external tools that process the metadata.'
+			)
+			.addToggle((toggle) => {
+				toggle
+					.setValue(this.plugin.settings.processCalloutBlocks)
+					.onChange((state) => {
+						this.plugin.settings.processCalloutBlocks = state;
 						this.plugin.saveSettings();
 					});
 			});

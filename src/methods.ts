@@ -1,3 +1,5 @@
+import { createReadStream } from 'fs';
+import * as readline from 'readline';
 import type BridgePlugin from './main';
 import {
 	App,
@@ -70,6 +72,73 @@ export default class Methods {
 		// absolute path
 		return `${basePath}/${relativePath}`;
 	}
+
+async getCallouts(
+	file: TFile,
+	currentBlocks: Record<
+		string,
+		{ position: { start: { line: number }; end?: { line: number } }; title?: string }
+	>
+): Promise<{ heading: string; level: number }[]> {
+	const adapter = this.app.vault.adapter as FileSystemAdapter;
+	const absolutePath = adapter.getFullPath(file.path);
+
+	const blocks = Object.entries(currentBlocks)
+		.map(([blockId, blockData]) => ({
+			blockId,
+			blockBegin: blockData.position.start.line,
+			blockEnd: blockData.position.end ?
+				blockData.position.end.line - 1 :
+				blockData.position.start.line,
+			blockData,
+		}))
+		.sort((a, b) => a.blockBegin - b.blockBegin);
+
+	const currentCallouts: { heading: string; level: number }[] = [];
+	const stream = createReadStream(absolutePath, { encoding: 'utf8' });
+	const rl = readline.createInterface({ input: stream });
+
+	let currentLine = 0;
+	let blockIndex = 0;
+	let currentBlock = blocks[blockIndex];
+	let headerLine: string | undefined;
+
+	for await (const line of rl) {
+		if (!currentBlock) break; // No more blocks to process
+
+		// Get the callouts first and line to check if they match the pattern
+		if (currentLine === currentBlock.blockBegin)
+			headerLine = line;
+
+		if (currentLine === currentBlock.blockEnd) {
+			const lastLine = line;
+
+			const headerMatch = headerLine?.match(/^>\s*\[!(\w+)\]\s*[-+]?\s*(.+)/);
+			if (headerMatch && lastLine.trim().startsWith('>')) {
+				const title = headerMatch[2].trim();
+				if (title.length > 0) {
+					const entry = `${title} (${currentBlock.blockId})`;
+					// TODO: Workaround. using headings as more changes would be needed in
+					// Shimmering Obsidian plugin.
+					currentCallouts.push({ heading: entry, level: 6 });
+					currentBlock.blockData.title = title;
+				}
+			}
+
+			// Move to the next block.
+			blockIndex++;
+			currentBlock = blocks[blockIndex];
+			headerLine = undefined;
+		}
+
+		currentLine++;
+	}
+
+	rl.close();
+	// console.log("Callouts in file: " + currentCallouts.length);
+	return currentCallouts;
+}
+
 
 	/**
 	 *
@@ -249,7 +318,7 @@ export default class Methods {
 		}
 	}
 
-	writeCacheToJSON(fileName: string) {
+	async writeCacheToJSON(fileName: string) {
 		let path = this.plugin.settings.metadataPath;
 		// only set the path to the plugin folder if no other path is specified
 		if (!this.plugin.settings.metadataPath) {
@@ -310,6 +379,13 @@ export default class Methods {
 					});
 				});
 				metaObj.headings = currentHeadings;
+			}
+
+
+			const processCalloutBlocks = true;
+			if (this.plugin.settings.processCalloutBlocks && currentCache.blocks) {
+				const callouts = await this.getCallouts(tfile, currentCache.blocks);
+					metaObj.headings?.push(...callouts)
 			}
 
 			const linkMetaObj = calculateLinks(

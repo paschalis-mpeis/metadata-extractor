@@ -12,6 +12,7 @@ export interface BridgeSettings {
 	consoleLog: boolean;
 	canvasFile: string;
 	canvasPath: string;
+	processCalloutBlocks: boolean;
 }
 
 /**
