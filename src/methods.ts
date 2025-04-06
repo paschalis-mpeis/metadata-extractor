@@ -73,13 +73,13 @@ export default class Methods {
 		return `${basePath}/${relativePath}`;
 	}
 
-async getCallouts(
+async getCalloutBlocks(
 	file: TFile,
 	currentBlocks: Record<
 		string,
 		{ position: { start: { line: number }; end?: { line: number } }; title?: string }
 	>
-): Promise<{ heading: string; level: number }[]> {
+): Promise<{ block: string , id: string, type: string}[]> {
 	const adapter = this.app.vault.adapter as FileSystemAdapter;
 	const absolutePath = adapter.getFullPath(file.path);
 
@@ -94,7 +94,7 @@ async getCallouts(
 		}))
 		.sort((a, b) => a.blockBegin - b.blockBegin);
 
-	const currentCallouts: { heading: string; level: number }[] = [];
+	const currentCallouts: { block: string, id: string, type: string}[] = [];
 	const stream = createReadStream(absolutePath, { encoding: 'utf8' });
 	const rl = readline.createInterface({ input: stream });
 
@@ -117,11 +117,7 @@ async getCallouts(
 			if (headerMatch && lastLine.trim().startsWith('>')) {
 				const title = headerMatch[2].trim();
 				if (title.length > 0) {
-					const entry = `${title} (${currentBlock.blockId})`;
-					// TODO: Workaround. using headings as more changes would be needed in
-					// Shimmering Obsidian plugin.
-					currentCallouts.push({ heading: entry, level: 6 });
-					currentBlock.blockData.title = title;
+					currentCallouts.push({ block: title, id: currentBlock.blockId, type: "callout"});
 				}
 			}
 
@@ -384,8 +380,8 @@ async getCallouts(
 
 			const processCalloutBlocks = true;
 			if (this.plugin.settings.processCalloutBlocks && currentCache.blocks) {
-				const callouts = await this.getCallouts(tfile, currentCache.blocks);
-					metaObj.headings?.push(...callouts)
+				const calloutBlocks = await this.getCalloutBlocks(tfile, currentCache.blocks);
+					metaObj.blocks = calloutBlocks
 			}
 
 			const linkMetaObj = calculateLinks(

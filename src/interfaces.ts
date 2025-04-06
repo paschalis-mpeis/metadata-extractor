@@ -23,6 +23,7 @@ export interface Metadata {
 	relativePath: string;
 	tags?: string[];
 	headings?: { heading: string; level: number }[];
+	blocks?: { block: string; id: string; type: string}[];
 	aliases?: string[];
 	links?: links[];
 	backlinks?: backlinks[];
